@@ -1,0 +1,101 @@
+from flask import Flask, render_template, Response, request, jsonify
+from camera.stream import CameraStream
+from gamepad.controller import GamepadController
+import signal
+import sys
+
+app = Flask(__name__)
+
+# Initialize components
+camera_stream = CameraStream()
+gamepad_controller = GamepadController()
+
+def signal_handler(sig, frame):
+    """Handle shutdown gracefully"""
+    print('\nShutting down gracefully...')
+    camera_stream.stop()
+    gamepad_controller.close()
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
+
+@app.route('/')
+def index():
+    """Main page with camera stream and controls"""
+    return render_template('index.html')
+
+def generate_frames():
+    """Generate video frames for streaming"""
+    while True:
+        frame = camera_stream.get_frame()
+        if frame:
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+
+@app.route('/video_feed')
+def video_feed():
+    """Video streaming route"""
+    return Response(generate_frames(), 
+                   mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route('/control', methods=['POST'])
+def control():
+    """Handle tank control commands from web interface"""
+    try:
+        data = request.get_json()
+        command = data.get('command') if data else request.form.get('command')
+        
+        if command:
+            gamepad_controller.handle_command(command)
+            return jsonify({'status': 'success', 'command': command})
+        else:
+            return jsonify({'status': 'error', 'message': 'No command provided'}), 400
+            
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/status')
+def status():
+    """Get current system status"""
+    try:
+        return jsonify({
+            'camera_streaming': camera_stream.is_streaming,
+            'gamepad_status': gamepad_controller.get_status()
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/gamepad_control', methods=['POST'])
+def gamepad_control():
+    """Handle direct gamepad input from web interface"""
+    try:
+        data = request.get_json()
+        left_stick_y = data.get('left_stick_y', 0)
+        right_stick_y = data.get('right_stick_y', 0)
+        
+        gamepad_controller.motor_control.handle_gamepad_input(left_stick_y, right_stick_y)
+        return jsonify({'status': 'success'})
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+if __name__ == '__main__':
+    print("Starting Pi Tank Controller Web Server...")
+    
+    # Start camera stream
+    camera_stream.start()
+    print("Camera stream started")
+    
+    # Start gamepad controller
+    gamepad_controller.start()
+    print("Gamepad controller started")
+    
+    try:
+        print("Web server starting on http://0.0.0.0:5000")
+        app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
+    except Exception as e:
+        print(f"Error starting web server: {e}")
+    finally:
+        print("Cleaning up...")
+        camera_stream.stop()
+        gamepad_controller.close()

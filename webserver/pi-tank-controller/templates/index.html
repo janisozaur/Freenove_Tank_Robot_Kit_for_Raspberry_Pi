@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pi Tank Controller</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Pi Tank Controller</h1>
+        
+        <div class="main-content">
+            <div class="camera-section">
+                <h2>Camera Stream</h2>
+                <div id="camera-stream">
+                    <img id="stream" src="{{ url_for('video_feed') }}" alt="Camera Stream">
+                </div>
+            </div>
+            
+            <div class="controls-section">
+                <div class="control-panel">
+                    <h2>Tank Controls</h2>
+                    <div class="button-controls">
+                        <button id="forward" class="control-btn">↑ Forward</button>
+                        <div class="middle-row">
+                            <button id="left" class="control-btn">← Left</button>
+                            <button id="stop" class="control-btn stop-btn">⏹ Stop</button>
+                            <button id="right" class="control-btn">→ Right</button>
+                        </div>
+                        <button id="backward" class="control-btn">↓ Backward</button>
+                    </div>
+                </div>
+                
+                <div class="gamepad-section">
+                    <h3>Gamepad Status</h3>
+                    <div id="gamepad-status">
+                        <p id="gamepad-connected">Checking gamepad...</p>
+                        <div id="gamepad-info"></div>
+                    </div>
+                </div>
+                
+                <div class="virtual-gamepad">
+                    <h3>Virtual Tank Controls</h3>
+                    <div class="tank-sticks">
+                        <div class="stick-container">
+                            <label>Left Track</label>
+                            <input type="range" id="left-track" min="-100" max="100" value="0" orient="vertical">
+                            <span id="left-value">0</span>
+                        </div>
+                        <div class="stick-container">
+                            <label>Right Track</label>
+                            <input type="range" id="right-track" min="-100" max="100" value="0" orient="vertical">
+                            <span id="right-value">0</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="status-section">
+                    <h3>System Status</h3>
+                    <div id="status-display">
+                        <p>Camera: <span id="camera-status">Unknown</span></p>
+                        <p>Motor Left: <span id="motor-left">0</span></p>
+                        <p>Motor Right: <span id="motor-right">0</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='js/gamepad.js') }}"></script>
+</body>
+</html>
