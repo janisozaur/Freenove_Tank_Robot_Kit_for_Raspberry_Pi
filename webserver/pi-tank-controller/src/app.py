@@ -130,6 +130,8 @@ def crane_status():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 if __name__ == '__main__':
+    global _components_started
+    
     print("Starting Pi Tank Controller Web Server...")
     
     try:
