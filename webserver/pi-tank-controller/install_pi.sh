@@ -11,27 +11,28 @@ sudo apt update
 echo "Installing system dependencies..."
 sudo apt install -y python3-pip python3-venv libcamera-dev libcamera-tools
 
+# Install uv (fast Python package installer)
+echo "Installing uv..."
+curl -LsSf https://astral.sh/uv/install.sh | sh
+export PATH="$HOME/.cargo/bin:$PATH"
+
 # Create virtual environment if it doesn't exist
 if [ ! -d "venv" ]; then
-    echo "Creating virtual environment..."
-    python3 -m venv venv
+    echo "Creating virtual environment with uv..."
+    uv venv venv
 fi
 
 # Activate virtual environment
 echo "Activating virtual environment..."
 source venv/bin/activate
 
-# Upgrade pip
-echo "Upgrading pip..."
-pip install --upgrade pip
-
-# Install Python dependencies
-echo "Installing Python dependencies..."
-pip install -r requirements.txt
+# Install Python dependencies using uv
+echo "Installing Python dependencies with uv..."
+uv pip install -r requirements.txt
 
 # Additional picamera2 installation with specific flags for Pi
 echo "Installing picamera2 with Pi optimizations..."
-pip install --upgrade picamera2[gui]
+uv pip install --upgrade picamera2[gui]
 
 echo "Testing camera functionality..."
 python3 src/test_camera_detailed.py
