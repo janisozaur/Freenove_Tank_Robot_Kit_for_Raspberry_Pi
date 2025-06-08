@@ -265,7 +265,8 @@ class CraneControl:
                 return False
         else:
             print(f"Unknown crane command: {command}")
-            return False    def close(self):
+            return False
+    def close(self):
         """Clean up servo resources"""
         global _active_crane_instance
         
