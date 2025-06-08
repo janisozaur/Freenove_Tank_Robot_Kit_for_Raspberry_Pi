@@ -95,6 +95,31 @@ def gamepad_control():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+@app.route('/crane_control', methods=['POST'])
+def crane_control():
+    """Handle crane control commands from web interface"""
+    try:
+        data = request.get_json()
+        command = data.get('command') if data else request.form.get('command')
+        
+        if command:
+            result = gamepad_controller.crane_control.handle_command(command)
+            return jsonify({'status': 'success', 'command': command, 'result': result})
+        else:
+            return jsonify({'status': 'error', 'message': 'No command provided'}), 400
+            
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/crane_status')
+def crane_status():
+    """Get current crane status"""
+    try:
+        status = gamepad_controller.crane_control.get_status()
+        return jsonify(status)
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 if __name__ == '__main__':
     print("Starting Pi Tank Controller Web Server...")
     

@@ -25,6 +25,18 @@ class TankController {
             document.getElementById(direction).addEventListener('mouseup', () => this.sendCommand('stop'));
             document.getElementById(direction).addEventListener('mouseleave', () => this.sendCommand('stop'));
         });
+        
+        // Crane controls
+        document.getElementById('crane-up').addEventListener('mousedown', () => this.sendCraneCommand('crane_up'));
+        document.getElementById('crane-down').addEventListener('mousedown', () => this.sendCraneCommand('crane_down'));
+        document.getElementById('grabber-open').addEventListener('click', () => this.sendCraneCommand('grabber_open'));
+        document.getElementById('grabber-close').addEventListener('click', () => this.sendCraneCommand('grabber_close'));
+        
+        // Stop crane on button release
+        ['crane-up', 'crane-down'].forEach(direction => {
+            document.getElementById(direction).addEventListener('mouseup', () => this.sendCraneCommand('crane_stop'));
+            document.getElementById(direction).addEventListener('mouseleave', () => this.sendCraneCommand('crane_stop'));
+        });
 
         // Keyboard controls
         document.addEventListener('keydown', this.handleKeyDown.bind(this));
@@ -68,6 +80,22 @@ class TankController {
                 event.preventDefault();
                 this.sendCommand('stop');
                 break;
+            case 'KeyQ':
+                event.preventDefault();
+                this.sendCraneCommand('crane_up');
+                break;
+            case 'KeyE':
+                event.preventDefault();
+                this.sendCraneCommand('crane_down');
+                break;
+            case 'KeyR':
+                event.preventDefault();
+                this.sendCraneCommand('grabber_open');
+                break;
+            case 'KeyF':
+                event.preventDefault();
+                this.sendCraneCommand('grabber_close');
+                break;
         }
     }
 
@@ -83,6 +111,11 @@ class TankController {
             case 'KeyD':
                 event.preventDefault();
                 this.sendCommand('stop');
+                break;
+            case 'KeyQ':
+            case 'KeyE':
+                event.preventDefault();
+                this.sendCraneCommand('crane_stop');
                 break;
         }
     }
@@ -158,6 +191,15 @@ class TankController {
         if (gamepad.buttons[0] && gamepad.buttons[0].pressed) { // A button - stop
             this.sendCommand('stop');
         }
+        if (gamepad.buttons[1] && gamepad.buttons[1].pressed) { // B button - crane up
+            this.sendCraneCommand('crane_up');
+        }
+        if (gamepad.buttons[2] && gamepad.buttons[2].pressed) { // X button - crane down
+            this.sendCraneCommand('crane_down');
+        }
+        if (gamepad.buttons[3] && gamepad.buttons[3].pressed) { // Y button - grabber toggle
+            this.toggleGrabber();
+        }
 
         this.lastCommandTime = now;
     }
@@ -191,6 +233,58 @@ class TankController {
         })
         .catch(error => {
             console.error('Error sending command:', error);
+        });
+    }
+
+    sendCraneCommand(command) {
+        fetch('/crane_control', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ command: command }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status !== 'success') {
+                console.error('Crane command failed:', data.message);
+            }
+            this.updateCraneStatus();
+        })
+        .catch(error => {
+            console.error('Error sending crane command:', error);
+        });
+    }
+
+    toggleGrabber() {
+        // Get current grabber status and toggle
+        fetch('/crane_status')
+        .then(response => response.json())
+        .then(data => {
+            if (data.grabber_position === 'open') {
+                this.sendCraneCommand('grabber_close');
+            } else {
+                this.sendCraneCommand('grabber_open');
+            }
+        })
+        .catch(error => {
+            console.error('Error getting crane status:', error);
+        });
+    }
+
+    updateCraneStatus() {
+        fetch('/crane_status')
+        .then(response => response.json())
+        .then(data => {
+            if (data.crane_position) {
+                document.getElementById('crane-position').textContent = data.crane_position;
+            }
+            if (data.grabber_position) {
+                document.getElementById('grabber-position').textContent = data.grabber_position;
+            }
+        })
+        .catch(error => {
+            console.error('Error updating crane status:', error);
         });
     }
 
@@ -248,6 +342,15 @@ class TankController {
                     document.getElementById('motor-right').textContent = 
                         data.gamepad_status.motor_speeds.right || 0;
                 }
+                
+                // Update crane status
+                if (data.gamepad_status && data.gamepad_status.crane_status) {
+                    const craneStatus = data.gamepad_status.crane_status;
+                    document.getElementById('crane-position').textContent = 
+                        craneStatus.crane_position || 'Unknown';
+                    document.getElementById('grabber-position').textContent = 
+                        craneStatus.grabber_position || 'Unknown';
+                }
             })
             .catch(error => {
                 console.error('Error updating status:', error);
@@ -269,6 +372,9 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('Controls:');
     console.log('- Arrow keys or WASD for movement');
     console.log('- Space bar to stop');
+    console.log('- Q/E for crane up/down');
+    console.log('- R for grabber open, F for grabber close');
     console.log('- Mouse buttons for manual control');
     console.log('- Connect a gamepad for analog control');
+    console.log('- Gamepad: A=stop, B=crane up, X=crane down, Y=toggle grabber');
 });

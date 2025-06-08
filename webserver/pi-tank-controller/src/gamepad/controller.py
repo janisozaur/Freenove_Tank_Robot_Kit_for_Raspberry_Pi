@@ -2,11 +2,13 @@ import pygame
 import threading
 import time
 from tank.motor_control import TankMotorControl
+from tank.crane_control import CraneControl
 
 class GamepadController:
     def __init__(self):
         """Initialize gamepad controller with pygame"""
         self.motor_control = TankMotorControl()
+        self.crane_control = CraneControl()
         self.running = False
         self.thread = None
         self.gamepad = None
@@ -141,6 +143,19 @@ class GamepadController:
                     # Handle specific button actions
                     if self.button_states.get('button_0', False):  # A button (stop)
                         self.motor_control.stop()
+                    
+                    # Crane controls using gamepad buttons
+                    if self.button_states.get('button_1', False):  # B button (crane up)
+                        self.crane_control.lift_crane()
+                    if self.button_states.get('button_2', False):  # X button (crane down)  
+                        self.crane_control.lower_crane()
+                    if self.button_states.get('button_3', False):  # Y button (grabber toggle)
+                        # Simple toggle based on current position
+                        status = self.crane_control.get_status()
+                        if status['grabber_position'] == 'open':
+                            self.crane_control.close_grabber()
+                        else:
+                            self.crane_control.open_grabber()
                 
                 clock.tick(60)  # 60 FPS
                 
@@ -151,6 +166,7 @@ class GamepadController:
     def handle_command(self, command):
         """Handle web-based commands"""
         try:
+            # Tank movement commands
             if command == 'forward':
                 self.motor_control.move_forward()
             elif command == 'backward':
@@ -161,6 +177,19 @@ class GamepadController:
                 self.motor_control.turn_right()
             elif command == 'stop':
                 self.motor_control.stop()
+            # Crane control commands
+            elif command == 'crane_up':
+                self.crane_control.lift_crane()
+            elif command == 'crane_down':
+                self.crane_control.lower_crane()
+            elif command == 'grabber_open':
+                self.crane_control.open_grabber()
+            elif command == 'grabber_close':
+                self.crane_control.close_grabber()
+            elif command == 'crane_stop':
+                self.crane_control.stop_crane()
+            elif command == 'grabber_stop':
+                self.crane_control.stop_grabber()
             else:
                 print(f"Unknown command: {command}")
         except Exception as e:
@@ -168,15 +197,20 @@ class GamepadController:
 
     def get_status(self):
         """Get current gamepad and motor status"""
+        motor_status = {
+            'left': self.motor_control.current_left_speed,
+            'right': self.motor_control.current_right_speed
+        }
+        
+        crane_status = self.crane_control.get_status() if self.crane_control else {}
+        
         return {
             'gamepad_connected': self.gamepad is not None,
             'gamepad_name': self.gamepad.get_name() if self.gamepad else None,
             'button_states': self.button_states,
             'axis_states': self.axis_states,
-            'motor_speeds': {
-                'left': self.motor_control.current_left_speed,
-                'right': self.motor_control.current_right_speed
-            }
+            'motor_speeds': motor_status,
+            'crane_status': crane_status
         }
 
     def close(self):
@@ -190,6 +224,12 @@ class GamepadController:
             self.motor_control.close()
         except Exception as e:
             print(f"Error closing motor control: {e}")
+            
+        try:
+            if self.crane_control:
+                self.crane_control.close()
+        except Exception as e:
+            print(f"Error closing crane control: {e}")
         
         try:
             if self.gamepad:

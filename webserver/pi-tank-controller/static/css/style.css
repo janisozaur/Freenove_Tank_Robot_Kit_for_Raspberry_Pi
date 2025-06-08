@@ -96,6 +96,46 @@ h1 {
     gap: 15px;
 }
 
+/* Crane Controls */
+.crane-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 15px;
+}
+
+.crane-section, .grabber-section {
+    text-align: center;
+}
+
+.crane-section h4, .grabber-section h4 {
+    margin-bottom: 10px;
+    color: #fff;
+    font-size: 14px;
+}
+
+.crane-buttons, .grabber-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.crane-btn {
+    background: linear-gradient(145deg, #f39c12, #e67e22) !important;
+}
+
+.crane-btn:hover {
+    background: linear-gradient(145deg, #f4ac32, #f68e32) !important;
+}
+
+.grabber-btn {
+    background: linear-gradient(145deg, #9b59b6, #8e44ad) !important;
+}
+
+.grabber-btn:hover {
+    background: linear-gradient(145deg, #ab69c6, #9e54bd) !important;
+}
+
 .control-btn {
     padding: 15px 20px;
     font-size: 16px;
@@ -260,5 +300,15 @@ h1 {
     .control-btn {
         padding: 12px 16px;
         font-size: 14px;
+    }
+    
+    .crane-controls {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    .crane-buttons, .grabber-buttons {
+        flex-direction: row;
+        justify-content: center;
     }
 }
