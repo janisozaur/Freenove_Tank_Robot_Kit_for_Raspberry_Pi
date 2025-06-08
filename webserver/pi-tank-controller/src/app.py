@@ -30,8 +30,7 @@ def signal_handler(sig, frame):
     camera_stream.stop()
     gamepad_controller.close()
     crane_control.close()
-    global _components_started
-    _components_started = False
+    globals()['_components_started'] = False
     sys.exit(0)
 
 signal.signal(signal.SIGINT, signal_handler)
@@ -130,8 +129,6 @@ def crane_status():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 if __name__ == '__main__':
-    global _components_started
-    
     print("Starting Pi Tank Controller Web Server...")
     
     try:
@@ -145,7 +142,7 @@ if __name__ == '__main__':
             gamepad_controller.start()
             print("Gamepad controller started")
             
-            _components_started = True
+            globals()['_components_started'] = True
         else:
             print("Components already started, skipping initialization...")
 
@@ -171,5 +168,4 @@ if __name__ == '__main__':
         except Exception as e:
             print(f"Error closing crane control: {e}")
         
-        global _components_started
-        _components_started = False
+        globals()['_components_started'] = False
