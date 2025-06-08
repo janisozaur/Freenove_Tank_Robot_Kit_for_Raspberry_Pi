@@ -4,6 +4,7 @@ from gamepad.controller import GamepadController
 import signal
 import sys
 import os
+import time
 
 # Get the directory containing this script
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -35,10 +36,17 @@ def index():
 def generate_frames():
     """Generate video frames for streaming"""
     while True:
-        frame = camera_stream.get_frame()
-        if frame:
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+        try:
+            frame = camera_stream.get_frame()
+            if frame and len(frame) > 0:
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+            else:
+                # If no frame is available, wait a bit and try again
+                time.sleep(0.1)
+        except Exception as e:
+            print(f"Error in generate_frames: {e}")
+            time.sleep(0.1)
 
 @app.route('/video_feed')
 def video_feed():

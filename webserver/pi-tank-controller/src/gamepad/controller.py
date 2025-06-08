@@ -48,6 +48,10 @@ class GamepadController:
 
     def start(self):
         """Start gamepad input thread"""
+        if self.running:
+            print("Gamepad controller already started, skipping...")
+            return
+            
         if not self.running:
             self.running = True
             self.thread = threading.Thread(target=self._input_loop)
