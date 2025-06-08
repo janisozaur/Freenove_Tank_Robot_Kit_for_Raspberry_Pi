@@ -6,6 +6,7 @@ class TankController {
         this.lastCommandTime = 0;
         this.commandCooldown = 50; // ms
         this.deadzone = 0.1;
+        this.yButtonPressed = false; // For grabber toggle
         
         this.initializeEventListeners();
         this.startGamepadPolling();
@@ -19,6 +20,19 @@ class TankController {
         document.getElementById('left').addEventListener('mousedown', () => this.sendCommand('left'));
         document.getElementById('right').addEventListener('mousedown', () => this.sendCommand('right'));
         document.getElementById('stop').addEventListener('click', () => this.sendCommand('stop'));
+        
+        // Crane controls
+        document.getElementById('crane-up').addEventListener('mousedown', () => this.sendCraneCommand('crane_up'));
+        document.getElementById('crane-down').addEventListener('mousedown', () => this.sendCraneCommand('crane_down'));
+        document.getElementById('grabber-open').addEventListener('click', () => this.sendCraneCommand('grabber_open'));
+        document.getElementById('grabber-close').addEventListener('click', () => this.sendCraneCommand('grabber_close'));
+        document.getElementById('crane-stop').addEventListener('click', () => this.sendCraneCommand('crane_stop'));
+        
+        // Stop crane movement on button release
+        ['crane-up', 'crane-down'].forEach(direction => {
+            document.getElementById(direction).addEventListener('mouseup', () => this.sendCraneCommand('crane_stop'));
+            document.getElementById(direction).addEventListener('mouseleave', () => this.sendCraneCommand('crane_stop'));
+        });
         
         // Stop on button release
         ['forward', 'backward', 'left', 'right'].forEach(direction => {
@@ -68,6 +82,23 @@ class TankController {
                 event.preventDefault();
                 this.sendCommand('stop');
                 break;
+            // Crane controls
+            case 'KeyQ':
+                event.preventDefault();
+                this.sendCraneCommand('crane_up');
+                break;
+            case 'KeyE':
+                event.preventDefault();
+                this.sendCraneCommand('crane_down');
+                break;
+            case 'KeyR':
+                event.preventDefault();
+                this.sendCraneCommand('grabber_open');
+                break;
+            case 'KeyT':
+                event.preventDefault();
+                this.sendCraneCommand('grabber_close');
+                break;
         }
     }
 
@@ -83,6 +114,12 @@ class TankController {
             case 'KeyD':
                 event.preventDefault();
                 this.sendCommand('stop');
+                break;
+            // Stop crane movement on key release
+            case 'KeyQ':
+            case 'KeyE':
+                event.preventDefault();
+                this.sendCraneCommand('crane_stop');
                 break;
         }
     }
@@ -158,6 +195,41 @@ class TankController {
         if (gamepad.buttons[0] && gamepad.buttons[0].pressed) { // A button - stop
             this.sendCommand('stop');
         }
+        
+        // Crane control buttons
+        if (gamepad.buttons[1] && gamepad.buttons[1].pressed) { // B button - crane up
+            this.sendCraneCommand('crane_up');
+        }
+        
+        if (gamepad.buttons[2] && gamepad.buttons[2].pressed) { // X button - crane down
+            this.sendCraneCommand('crane_down');
+        }
+        
+        if (gamepad.buttons[3] && gamepad.buttons[3].pressed) { // Y button - toggle grabber
+            if (!this.yButtonPressed) {
+                this.sendCraneCommand('grabber_toggle');
+                this.yButtonPressed = true;
+            }
+        } else {
+            this.yButtonPressed = false;
+        }
+        
+        // Shoulder buttons for crane controls
+        if (gamepad.buttons[4] && gamepad.buttons[4].pressed) { // Left bumper - crane up
+            this.sendCraneCommand('crane_up');
+        }
+        
+        if (gamepad.buttons[5] && gamepad.buttons[5].pressed) { // Right bumper - crane down
+            this.sendCraneCommand('crane_down');
+        }
+        
+        if (gamepad.buttons[6] && gamepad.buttons[6].pressed) { // Left trigger - open grabber
+            this.sendCraneCommand('grabber_open');
+        }
+        
+        if (gamepad.buttons[7] && gamepad.buttons[7].pressed) { // Right trigger - close grabber
+            this.sendCraneCommand('grabber_close');
+        }
 
         this.lastCommandTime = now;
     }
@@ -191,6 +263,25 @@ class TankController {
         })
         .catch(error => {
             console.error('Error sending command:', error);
+        });
+    }
+
+    sendCraneCommand(command) {
+        fetch('/crane_control', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ command: command }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status !== 'success') {
+                console.error('Crane command failed:', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error sending crane command:', error);
         });
     }
 
@@ -247,6 +338,15 @@ class TankController {
                         data.gamepad_status.motor_speeds.left || 0;
                     document.getElementById('motor-right').textContent = 
                         data.gamepad_status.motor_speeds.right || 0;
+                }
+                
+                // Update crane status if available
+                if (data.gamepad_status && data.gamepad_status.crane_status) {
+                    const craneStatus = data.gamepad_status.crane_status;
+                    document.getElementById('crane-position').textContent = 
+                        craneStatus.crane_position || 'Unknown';
+                    document.getElementById('grabber-position').textContent = 
+                        craneStatus.grabber_position || 'Unknown';
                 }
             })
             .catch(error => {

@@ -1,6 +1,7 @@
 from flask import Flask, render_template, Response, request, jsonify
 from camera.stream import CameraStream
 from gamepad.controller import GamepadController
+from tank.crane_control import CraneControl
 import signal
 import sys
 import os
@@ -18,12 +19,14 @@ app = Flask(__name__,
 # Initialize components
 camera_stream = CameraStream()
 gamepad_controller = GamepadController()
+crane_control = CraneControl()
 
 def signal_handler(sig, frame):
     """Handle shutdown gracefully"""
     print('\nShutting down gracefully...')
     camera_stream.stop()
     gamepad_controller.close()
+    crane_control.close()
     sys.exit(0)
 
 signal.signal(signal.SIGINT, signal_handler)
@@ -92,6 +95,32 @@ def gamepad_control():
         gamepad_controller.motor_control.handle_gamepad_input(left_stick_y, right_stick_y)
         return jsonify({'status': 'success'})
         
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/crane_control', methods=['POST'])
+def crane_control_endpoint():
+    """Handle crane and grabber control commands"""
+    try:
+        data = request.get_json()
+        command = data.get('command') if data else request.form.get('command')
+        
+        if command:
+            # Handle via gamepad controller which has crane control integration
+            success = gamepad_controller.handle_command(command)
+            return jsonify({'status': 'success', 'command': command})
+        else:
+            return jsonify({'status': 'error', 'message': 'No command provided'}), 400
+            
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/crane_status')
+def crane_status():
+    """Get current crane and grabber status"""
+    try:
+        status = crane_control.get_status()
+        return jsonify(status)
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
