@@ -26,11 +26,11 @@ _components_started = False
 
 def signal_handler(sig, frame):
     """Handle shutdown gracefully"""
-    global _components_started
     print('\nShutting down gracefully...')
     camera_stream.stop()
     gamepad_controller.close()
     crane_control.close()
+    global _components_started
     _components_started = False
     sys.exit(0)
 
@@ -130,8 +130,6 @@ def crane_status():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 if __name__ == '__main__':
-    global _components_started
-    
     print("Starting Pi Tank Controller Web Server...")
     
     try:
@@ -157,7 +155,6 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print("\nReceived shutdown signal")
     finally:
-        global _components_started
         print("Cleaning up...")
         try:
             camera_stream.stop()
@@ -172,4 +169,5 @@ if __name__ == '__main__':
         except Exception as e:
             print(f"Error closing crane control: {e}")
         
+        global _components_started
         _components_started = False
