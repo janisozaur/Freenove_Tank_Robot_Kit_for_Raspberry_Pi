@@ -3,8 +3,16 @@ from camera.stream import CameraStream
 from gamepad.controller import GamepadController
 import signal
 import sys
+import os
 
-app = Flask(__name__)
+# Get the directory containing this script
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# Go up one level to the pi-tank-controller directory
+project_root = os.path.dirname(current_dir)
+
+app = Flask(__name__, 
+           template_folder=os.path.join(project_root, 'templates'),
+           static_folder=os.path.join(project_root, 'static'))
 
 # Initialize components
 camera_stream = CameraStream()
@@ -82,20 +90,29 @@ def gamepad_control():
 if __name__ == '__main__':
     print("Starting Pi Tank Controller Web Server...")
     
-    # Start camera stream
-    camera_stream.start()
-    print("Camera stream started")
-    
-    # Start gamepad controller
-    gamepad_controller.start()
-    print("Gamepad controller started")
-    
     try:
+        # Start camera stream
+        camera_stream.start()
+        print("Camera stream started")
+        
+        # Start gamepad controller
+        gamepad_controller.start()
+        print("Gamepad controller started")
+        
         print("Web server starting on http://0.0.0.0:5000")
         app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
+        
     except Exception as e:
         print(f"Error starting web server: {e}")
+    except KeyboardInterrupt:
+        print("\nReceived shutdown signal")
     finally:
         print("Cleaning up...")
-        camera_stream.stop()
-        gamepad_controller.close()
+        try:
+            camera_stream.stop()
+        except Exception as e:
+            print(f"Error stopping camera: {e}")
+        try:
+            gamepad_controller.close()
+        except Exception as e:
+            print(f"Error closing gamepad: {e}")

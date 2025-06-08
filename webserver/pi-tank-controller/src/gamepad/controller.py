@@ -10,11 +10,22 @@ class GamepadController:
         self.running = False
         self.thread = None
         self.gamepad = None
+        self.pygame_initialized = False
         
         # Initialize pygame
         try:
             pygame.init()
             pygame.joystick.init()
+            # Initialize pygame display to avoid "video system not initialized" error
+            try:
+                pygame.display.init()
+                # Create a minimal display surface
+                pygame.display.set_mode((1, 1), pygame.NOFRAME)
+            except:
+                # If display init fails, continue without it
+                pass
+            
+            self.pygame_initialized = True
             print(f"Number of joysticks: {pygame.joystick.get_count()}")
             
             if pygame.joystick.get_count() > 0:
@@ -26,6 +37,7 @@ class GamepadController:
                 
         except Exception as e:
             print(f"Error initializing gamepad: {e}")
+            self.pygame_initialized = False
             
         # Button and axis states
         self.button_states = {}
@@ -68,6 +80,10 @@ class GamepadController:
 
     def _input_loop(self):
         """Main input processing loop"""
+        if not self.pygame_initialized:
+            print("Pygame not initialized, skipping input loop")
+            return
+            
         clock = pygame.time.Clock()
         
         while self.running:
@@ -77,7 +93,7 @@ class GamepadController:
                 if self.gamepad:
                     # Read analog sticks for tank-style control
                     left_stick_y = self.gamepad.get_axis(1)   # Left stick Y-axis
-                    right_stick_y = self.gamepad.get_axis(4)  # Right stick Y-axis (if available)
+                    right_stick_y = self.gamepad.get_axis(4) if self.gamepad.get_numaxes() > 4 else 0  # Right stick Y-axis (if available)
                     
                     # Apply deadzone
                     left_stick_y = self._apply_deadzone(left_stick_y)
@@ -99,6 +115,7 @@ class GamepadController:
                         # Dual stick tank control
                         right_stick_y = self._apply_deadzone(right_stick_y)
                         left_track = left_stick_y
+                        right_track = right_stick_y
                         right_track = right_stick_y
                     
                     # Send to motor control
@@ -160,11 +177,27 @@ class GamepadController:
 
     def close(self):
         """Clean up resources"""
-        self.stop()
-        self.motor_control.close()
-        if self.gamepad:
-            self.gamepad.quit()
-        pygame.quit()
+        try:
+            self.stop()
+        except Exception as e:
+            print(f"Error stopping gamepad controller: {e}")
+        
+        try:
+            self.motor_control.close()
+        except Exception as e:
+            print(f"Error closing motor control: {e}")
+        
+        try:
+            if self.gamepad:
+                self.gamepad.quit()
+        except Exception as e:
+            print(f"Error quitting gamepad: {e}")
+        
+        try:
+            if self.pygame_initialized:
+                pygame.quit()
+        except Exception as e:
+            print(f"Error quitting pygame: {e}")
 
 # Test the gamepad controller
 if __name__ == '__main__':
