@@ -18,12 +18,41 @@ class CameraStream:
             from picamera2 import Picamera2
             self.camera = Picamera2()
             
-            # Configure camera for Pi Camera Module 1 on Pi 3
-            camera_config = self.camera.create_still_configuration(
-                main={"size": (640, 480), "format": "RGB888"}
-            )
-            self.camera.configure(camera_config)
-            print("Pi Camera initialized successfully")
+            # Try different configuration approaches for compatibility
+            try:
+                # First try the most basic configuration without specifying format/size
+                print("Trying basic preview configuration...")
+                camera_config = self.camera.create_preview_configuration()
+                self.camera.configure(camera_config)
+                print("Pi Camera initialized successfully (basic configuration)")
+            except Exception as basic_error:
+                print(f"Basic configuration failed: {basic_error}")
+                try:
+                    # Try with specific size but no format
+                    print("Trying preview configuration with size...")
+                    camera_config = self.camera.create_preview_configuration(
+                        main={"size": (640, 480)}
+                    )
+                    self.camera.configure(camera_config)
+                    print("Pi Camera initialized successfully (size configuration)")
+                except Exception as size_error:
+                    print(f"Size configuration failed: {size_error}")
+                    try:
+                        # Try still configuration as fallback
+                        print("Trying still configuration...")
+                        camera_config = self.camera.create_still_configuration()
+                        self.camera.configure(camera_config)
+                        print("Pi Camera initialized successfully (still configuration)")
+                    except Exception as still_error:
+                        print(f"Still configuration failed: {still_error}")
+                        # Try to configure with minimal setup
+                        try:
+                            print("Trying minimal configuration...")
+                            # Don't call configure, just try to use the camera as-is
+                        except Exception as minimal_error:
+                            print(f"Minimal configuration also failed: {minimal_error}")
+                            raise minimal_error
+                    
         except ImportError as e:
             print(f"Pi Camera not available (libcamera missing): {e}")
             self._init_fallback_camera()
@@ -34,24 +63,38 @@ class CameraStream:
     def _init_fallback_camera(self):
         """Initialize fallback camera using OpenCV"""
         try:
-            # Try USB camera first
-            self.camera = cv2.VideoCapture(0)
-            if self.camera.isOpened():
-                # Test if we can actually read a frame
-                ret, test_frame = self.camera.read()
-                if ret and test_frame is not None:
+            # Try multiple camera indices (0, 1, 2) as different systems may have different camera assignments
+            for camera_index in [0, 1, 2]:
+                print(f"Trying camera index {camera_index}...")
+                self.camera = cv2.VideoCapture(camera_index)
+                
+                if self.camera.isOpened():
+                    # Set camera properties before testing
                     self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
                     self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                    self.use_fallback = True
-                    print("USB camera initialized successfully")
+                    self.camera.set(cv2.CAP_PROP_FPS, 30)
+                    
+                    # Test if we can actually read a frame
+                    print(f"Testing frame read from camera {camera_index}...")
+                    ret, test_frame = self.camera.read()
+                    
+                    if ret and test_frame is not None and test_frame.size > 0:
+                        print(f"USB camera {camera_index} initialized successfully")
+                        self.use_fallback = True
+                        return
+                    else:
+                        print(f"Camera {camera_index} opened but cannot read frames (ret={ret})")
+                        self.camera.release()
+                        
                 else:
-                    print("USB camera opened but cannot read frames")
-                    self.camera.release()
-                    self.camera = None
-                    print("No camera available - using dummy frames")
-            else:
-                self.camera = None
-                print("No camera available - using dummy frames")
+                    print(f"Camera {camera_index} could not be opened")
+                    if self.camera:
+                        self.camera.release()
+            
+            # If we get here, no cameras worked
+            self.camera = None
+            print("No working camera found - using dummy frames")
+            
         except Exception as e:
             print(f"Error initializing fallback camera: {e}")
             self.camera = None
@@ -121,16 +164,33 @@ class CameraStream:
                             self._generate_dummy_frame()
                     else:
                         # Pi camera
-                        frame_array = self.camera.capture_array()
-                        
-                        # Convert RGB to BGR for OpenCV
-                        frame_bgr = cv2.cvtColor(frame_array, cv2.COLOR_RGB2BGR)
-                        
-                        # Encode frame as JPEG
-                        _, jpeg = cv2.imencode('.jpg', frame_bgr, [cv2.IMWRITE_JPEG_QUALITY, 80])
-                        
-                        with self.lock:
-                            self.frame = jpeg.tobytes()
+                        try:
+                            frame_array = self.camera.capture_array()
+                            
+                            # Handle different formats that might be returned
+                            if frame_array is None:
+                                raise Exception("capture_array() returned None")
+                            
+                            # Check if it's already in BGR format or needs conversion
+                            if len(frame_array.shape) == 3 and frame_array.shape[2] == 3:
+                                # Assume RGB format and convert to BGR for OpenCV
+                                frame_bgr = cv2.cvtColor(frame_array, cv2.COLOR_RGB2BGR)
+                            elif len(frame_array.shape) == 3 and frame_array.shape[2] == 4:
+                                # RGBA format, convert to BGR
+                                frame_bgr = cv2.cvtColor(frame_array, cv2.COLOR_RGBA2BGR)
+                            else:
+                                # Unknown format, try to use as-is
+                                frame_bgr = frame_array
+                            
+                            # Encode frame as JPEG
+                            _, jpeg = cv2.imencode('.jpg', frame_bgr, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                            
+                            with self.lock:
+                                self.frame = jpeg.tobytes()
+                        except Exception as picam_error:
+                            print(f"Pi Camera capture error: {picam_error}")
+                            # Fall back to dummy frame if Pi camera fails
+                            self._generate_dummy_frame()
                 else:
                     # No camera - generate dummy frame
                     self._generate_dummy_frame()
