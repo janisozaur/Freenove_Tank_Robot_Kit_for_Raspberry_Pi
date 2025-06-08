@@ -39,12 +39,12 @@ class CraneControl:
             # Current positions
             self.current_crane_angle = 140   # Start in up position
             self.current_grabber_angle = 90  # Start in open position
-            
-            # Control lock for thread safety
+              # Control lock for thread safety
             self.lock = threading.Lock()
-              # Set initial positions
-            self.set_crane_angle(self.current_crane_angle)
-            self.set_grabber_angle(self.current_grabber_angle)
+            
+            # Don't set initial positions immediately to avoid conflicts
+            # Initial positions will be set on first use or explicit call
+            print("Crane control servo driver initialized - ready for use")
             
             if self._is_primary_instance:
                 print("Crane control initialized successfully (primary instance)")
@@ -103,6 +103,18 @@ class CraneControl:
         except Exception as e:
             print(f"Error initializing servo driver: {e}")
             return None
+
+    def set_initial_positions(self):
+        """Set servos to initial safe positions - call this explicitly when ready"""
+        try:
+            print("Setting crane to initial positions...")
+            self.set_crane_angle(self.current_crane_angle)  # Up position
+            self.set_grabber_angle(self.current_grabber_angle)  # Open position
+            print("Initial positions set successfully")
+            return True
+        except Exception as e:
+            print(f"Error setting initial positions: {e}")
+            return False
 
     def _ensure_angle_range(self, angle, min_angle, max_angle):
         """Ensure angle is within specified range"""

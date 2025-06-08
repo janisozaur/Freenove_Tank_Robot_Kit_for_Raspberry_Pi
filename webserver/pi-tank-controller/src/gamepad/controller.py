@@ -8,7 +8,7 @@ class GamepadController:
     def __init__(self):
         """Initialize gamepad controller with pygame"""
         self.motor_control = TankMotorControl()
-        self.crane_control = CraneControl()
+        self.crane_control = None  # Lazy initialize to avoid GPIO conflicts
         self.running = False
         self.thread = None
         self.gamepad = None
@@ -47,6 +47,19 @@ class GamepadController:
         
         # Deadzone for analog sticks
         self.deadzone = 0.1
+
+    def _get_crane_control(self):
+        """Lazy initialization of crane control to avoid GPIO conflicts on startup"""
+        if self.crane_control is None:
+            try:
+                self.crane_control = CraneControl()
+                # Set initial positions only after successful initialization
+                self.crane_control.set_initial_positions()
+                print("Crane control initialized on first use")
+            except Exception as e:
+                print(f"Error initializing crane control: {e}")
+                return None
+        return self.crane_control
 
     def start(self):
         """Start gamepad input thread"""
@@ -146,16 +159,22 @@ class GamepadController:
                     
                     # Crane controls using gamepad buttons
                     if self.button_states.get('button_1', False):  # B button (crane up)
-                        self.crane_control.lift_crane()
-                    if self.button_states.get('button_2', False):  # X button (crane down)  
-                        self.crane_control.lower_crane()
+                        crane = self._get_crane_control()
+                        if crane:
+                            crane.lift_crane()
+                    if self.button_states.get('button_2', False):  # X button (crane down)
+                        crane = self._get_crane_control()
+                        if crane:
+                            crane.lower_crane()
                     if self.button_states.get('button_3', False):  # Y button (grabber toggle)
-                        # Simple toggle based on current position
-                        status = self.crane_control.get_status()
-                        if status['grabber_position'] == 'open':
-                            self.crane_control.close_grabber()
-                        else:
-                            self.crane_control.open_grabber()
+                        crane = self._get_crane_control()
+                        if crane:
+                            # Simple toggle based on current position
+                            status = crane.get_status()
+                            if status['grabber_position'] == 'open':
+                                crane.close_grabber()
+                            else:
+                                crane.open_grabber()
                 
                 clock.tick(60)  # 60 FPS
                 
@@ -179,17 +198,29 @@ class GamepadController:
                 self.motor_control.stop()
             # Crane control commands
             elif command == 'crane_up':
-                self.crane_control.lift_crane()
+                crane = self._get_crane_control()
+                if crane:
+                    crane.lift_crane()
             elif command == 'crane_down':
-                self.crane_control.lower_crane()
+                crane = self._get_crane_control()
+                if crane:
+                    crane.lower_crane()
             elif command == 'grabber_open':
-                self.crane_control.open_grabber()
+                crane = self._get_crane_control()
+                if crane:
+                    crane.open_grabber()
             elif command == 'grabber_close':
-                self.crane_control.close_grabber()
+                crane = self._get_crane_control()
+                if crane:
+                    crane.close_grabber()
             elif command == 'crane_stop':
-                self.crane_control.stop_crane()
+                crane = self._get_crane_control()
+                if crane:
+                    crane.stop_crane()
             elif command == 'grabber_stop':
-                self.crane_control.stop_grabber()
+                crane = self._get_crane_control()
+                if crane:
+                    crane.stop_grabber()
             else:
                 print(f"Unknown command: {command}")
         except Exception as e:
@@ -202,7 +233,14 @@ class GamepadController:
             'right': self.motor_control.current_right_speed
         }
         
-        crane_status = self.crane_control.get_status() if self.crane_control else {}
+        # Only get crane status if crane control has been initialized
+        crane_status = {}
+        if self.crane_control is not None:
+            try:
+                crane_status = self.crane_control.get_status()
+            except Exception as e:
+                print(f"Error getting crane status: {e}")
+                crane_status = {'error': str(e)}
         
         return {
             'gamepad_connected': self.gamepad is not None,

@@ -103,8 +103,9 @@ def crane_control():
         command = data.get('command') if data else request.form.get('command')
         
         if command:
-            result = gamepad_controller.crane_control.handle_command(command)
-            return jsonify({'status': 'success', 'command': command, 'result': result})
+            # Use the gamepad controller's command handler which includes lazy init
+            gamepad_controller.handle_command(command)
+            return jsonify({'status': 'success', 'command': command})
         else:
             return jsonify({'status': 'error', 'message': 'No command provided'}), 400
             
@@ -115,8 +116,10 @@ def crane_control():
 def crane_status():
     """Get current crane status"""
     try:
-        status = gamepad_controller.crane_control.get_status()
-        return jsonify(status)
+        # Get crane status from gamepad controller which handles lazy init
+        status = gamepad_controller.get_status()
+        crane_status = status.get('crane_status', {})
+        return jsonify(crane_status)
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
