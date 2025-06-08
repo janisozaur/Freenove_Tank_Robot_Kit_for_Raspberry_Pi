@@ -5,10 +5,17 @@ from tank.motor_control import TankMotorControl
 from tank.crane_control import CraneControl
 
 class GamepadController:
-    def __init__(self):
+    def __init__(self, crane_control=None):
         """Initialize gamepad controller with pygame"""
         self.motor_control = TankMotorControl()
-        self.crane_control = CraneControl()
+        
+        # Use provided crane control or create new one if none provided
+        if crane_control is not None:
+            self.crane_control = crane_control
+        else:
+            from tank.crane_control import CraneControl
+            self.crane_control = CraneControl()
+            
         self.running = False
         self.thread = None
         self.gamepad = None
@@ -55,11 +62,12 @@ class GamepadController:
             return
             
         if not self.running:
+            print("Starting gamepad controller...")
             self.running = True
             self.thread = threading.Thread(target=self._input_loop)
             self.thread.daemon = True
             self.thread.start()
-            print("Gamepad controller started")
+            print("Gamepad controller started successfully")
 
     def stop(self):
         """Stop gamepad input thread"""

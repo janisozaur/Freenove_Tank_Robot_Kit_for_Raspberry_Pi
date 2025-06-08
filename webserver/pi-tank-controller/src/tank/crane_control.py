@@ -6,12 +6,29 @@ Handles the crane lift and grabber servo controls
 import time
 import threading
 
+# Global instance tracking to prevent GPIO conflicts
+_active_crane_instance = None
+_instance_lock = threading.Lock()
+
 class CraneControl:
     def __init__(self):
         """Initialize crane control with servo management"""
+        global _active_crane_instance
+        
         try:
-            # Import based on PCB version and Pi capabilities
-            self.servo_driver = self._initialize_servo_driver()
+            # Check if another instance is already active
+            with _instance_lock:
+                if _active_crane_instance is not None:
+                    print("Warning: Another CraneControl instance is already active. Sharing servo driver.")
+                    # Share the servo driver from the existing instance
+                    self.servo_driver = _active_crane_instance.servo_driver
+                    self._is_primary_instance = False
+                else:
+                    # This is the primary instance
+                    print("Creating primary CraneControl instance")
+                    self.servo_driver = self._initialize_servo_driver()
+                    self._is_primary_instance = True
+                    _active_crane_instance = self
             
             # Servo angle limits
             self.crane_min_angle = 90   # Crane down position
@@ -25,16 +42,19 @@ class CraneControl:
             
             # Control lock for thread safety
             self.lock = threading.Lock()
-            
-            # Set initial positions
+              # Set initial positions
             self.set_crane_angle(self.current_crane_angle)
             self.set_grabber_angle(self.current_grabber_angle)
             
-            print("Crane control initialized successfully")
+            if self._is_primary_instance:
+                print("Crane control initialized successfully (primary instance)")
+            else:
+                print("Crane control initialized successfully (shared instance)")
             
         except Exception as e:
             print(f"Error initializing crane control: {e}")
             self.servo_driver = None
+            self._is_primary_instance = False
 
     def _initialize_servo_driver(self):
         """Initialize the appropriate servo driver based on system capabilities"""
@@ -245,12 +265,13 @@ class CraneControl:
                 return False
         else:
             print(f"Unknown crane command: {command}")
-            return False
-
-    def close(self):
+            return False    def close(self):
         """Clean up servo resources"""
+        global _active_crane_instance
+        
         try:
-            if self.servo_driver and self.servo_driver['type'] == 'gpiozero':
+            # Only close servos if this is the primary instance
+            if self._is_primary_instance and self.servo_driver and self.servo_driver['type'] == 'gpiozero':
                 # Set servos to safe positions before closing
                 self.set_crane_angle(140)  # Up position
                 self.set_grabber_angle(90)  # Open position
@@ -262,7 +283,15 @@ class CraneControl:
                 if 'grabber' in self.servo_driver:
                     self.servo_driver['grabber'].close()
                     
-            print("Crane control closed successfully")
+                # Clear the global instance
+                with _instance_lock:
+                    if _active_crane_instance is self:
+                        _active_crane_instance = None
+                        
+                print("Crane control closed successfully (primary instance)")
+            else:
+                print("Crane control closed successfully (shared instance)")
+                
         except Exception as e:
             print(f"Error closing crane control: {e}")
 

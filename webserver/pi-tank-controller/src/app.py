@@ -18,15 +18,20 @@ app = Flask(__name__,
 
 # Initialize components
 camera_stream = CameraStream()
-gamepad_controller = GamepadController()
 crane_control = CraneControl()
+gamepad_controller = GamepadController(crane_control=crane_control)
+
+# Flag to prevent multiple starts
+_components_started = False
 
 def signal_handler(sig, frame):
     """Handle shutdown gracefully"""
+    global _components_started
     print('\nShutting down gracefully...')
     camera_stream.stop()
     gamepad_controller.close()
     crane_control.close()
+    _components_started = False
     sys.exit(0)
 
 signal.signal(signal.SIGINT, signal_handler)
@@ -125,25 +130,34 @@ def crane_status():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 if __name__ == '__main__':
+    global _components_started
+    
     print("Starting Pi Tank Controller Web Server...")
     
     try:
-        # Start camera stream
-        camera_stream.start()
-        print("Camera stream started")
-        
-        # Start gamepad controller
-        gamepad_controller.start()
-        print("Gamepad controller started")
-        
+        # Only start components once
+        if not _components_started:
+            # Start camera stream
+            camera_stream.start()
+            print("Camera stream started")
+            
+            # Start gamepad controller
+            gamepad_controller.start()
+            print("Gamepad controller started")
+            
+            _components_started = True
+        else:
+            print("Components already started, skipping initialization...")
+
         print("Web server starting on http://0.0.0.0:5000")
-        app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
+        app.run(host='0.0.0.0', port=5000, debug=False, threaded=True, use_reloader=False)
         
     except Exception as e:
         print(f"Error starting web server: {e}")
     except KeyboardInterrupt:
         print("\nReceived shutdown signal")
     finally:
+        global _components_started
         print("Cleaning up...")
         try:
             camera_stream.stop()
@@ -153,3 +167,9 @@ if __name__ == '__main__':
             gamepad_controller.close()
         except Exception as e:
             print(f"Error closing gamepad: {e}")
+        try:
+            crane_control.close()
+        except Exception as e:
+            print(f"Error closing crane control: {e}")
+        
+        _components_started = False

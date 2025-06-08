@@ -106,6 +106,7 @@ class CameraStream:
             
         if not self.is_streaming:
             try:
+                print("Starting camera stream...")
                 # Generate initial dummy frame to ensure get_frame() always returns something
                 self._generate_dummy_frame()
                 
@@ -118,7 +119,7 @@ class CameraStream:
                 self.thread = threading.Thread(target=self._capture_frames)
                 self.thread.daemon = True
                 self.thread.start()
-                print("Camera stream started")
+                print("Camera stream started successfully")
             except Exception as e:
                 print(f"Error starting camera: {e}")
                 self.is_streaming = False
